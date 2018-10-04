@@ -6,7 +6,6 @@ import ffmpeg
 import spotipy
 import requests
 from tqdm import tqdm
-from pytube import YouTube
 from bs4 import BeautifulSoup
 import spotipy.oauth2 as oauth2
 from mutagen.id3 import ID3, APIC
@@ -37,16 +36,40 @@ def download_trackdee(URL, output=localdir + "/Songs/", check=True):
     year = []
     genre = []
     ar_album = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    url = json.loads(requests.get("http://api.deezer.com/track/" + URL.split("/")[-1]).text)
+    if "?utm" in URL:
+     URL,a = URL.split("?utm")
+    URL = "http://www.deezer.com/track/" + URL.split("/")[-1]
     try:
-       if url['error']['message'] == "no data" or url['error']['message'] == "Invalid query":
+       url = json.loads(requests.get("http://api.deezer.com/track/" + URL.split("/")[-1]).text)
+    except:
+       url = json.loads(requests.get("http://api.deezer.com/track/" + URL.split("/")[-1]).text)
+    try:
+       if url['error']['message'] == "Quota limit exceeded":
+        raise QuotaExceeded("Too much requests limit yourself")
+    except KeyError:
+       None
+    try:
+       if "error" in str(url):
         raise InvalidLink("Invalid link ;)")
     except KeyError:
        None
-    url1 = json.loads(requests.get("http://api.deezer.com/album/" + str(url['album']['id'])).text)
-    image = url['album']['cover_xl'].replace("1000", "1200")
+    try:
+       url1 = json.loads(requests.get("http://api.deezer.com/album/" + str(url['album']['id']), headers=header).text)
+    except:
+       url1 = json.loads(requests.get("http://api.deezer.com/album/" + str(url['album']['id']), headers=header).text)
+    try:
+       if url1['error']['message'] == "Quota limit exceeded":
+        raise QuotaExceeded("Too much requests limit yourself")
+    except KeyError:
+       None
+    try:
+       image = url['album']['cover_xl'].replace("1000", "1200")
+    except:
+       try:
+          image = requests.get(URL).text
+       except:
+          image = requests.get(URL).text
+       image = BeautifulSoup(image, "html.parser").find("img", class_="img_main").get("src").replace("120", "1200")
     music.append(url['title'])
     for a in url['contributors']:
         array.append(a['name'])
@@ -64,22 +87,13 @@ def download_trackdee(URL, output=localdir + "/Songs/", check=True):
     discnum.append(url['disk_number'])
     year.append(url['album']['release_date'])
     song = music[0] + " - " + artist[0]
-    try:
-       if url1['error']['message'] == "no data":
-        raise TrackNotFound("Track not found: " + song)
-    except KeyError:
-       None
-    for a in url1['contributors']:
-        if a['role'] == "Main":
-         ar_album.append(a['name'])   
-    song = music[0] + " - " + artist[0]
     url = requests.get("https://www.youtube.com/results?search_query=" + music[0].replace("#", "") + "+" + artist[0].replace("#", ""))
     bs = BeautifulSoup(url.text, "html.parser")
     for topicplus in bs.find_all("a"):
         if len(topicplus.get("href")) == 20:
          down = topicplus.get("href")
          break
-    try:     
+    try:
        if pafy.new("https://www.youtube.com" + down).length > 600:
         raise TrackNotFound("Track not found: " + song)
     except OSError:
@@ -139,36 +153,65 @@ def download_albumdee(URL, output=localdir + "/Songs/", check=True):
     ar_album = []
     urls = []
     names = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    url = json.loads(requests.get("http://api.deezer.com/album/" + URL.split("/")[-1]).text)
+    if "?utm" in URL:
+     URL,a = URL.split("?utm")
+    URL = "http://www.deezer.com/album/" + URL.split("/")[-1]
     try:
-       if url['error']['message'] == "no data" or url['error']['message'] == "Invalid query":
+       url = json.loads(requests.get("http://api.deezer.com/album/" + URL.split("/")[-1], headers=header).text)
+    except:
+       url = json.loads(requests.get("http://api.deezer.com/album/" + URL.split("/")[-1], headers=header).text)
+    try:
+       if url['error']['message'] == "Quota limit exceeded":
+        raise QuotaExceeded("Too much requests limit yourself")
+    except KeyError:
+       None
+    try:
+       if "error" in str(url):
         raise InvalidLink("Invalid link ;)")
     except KeyError:
        None
-    image = url['cover_xl'].replace("1000", "1200")
+    try:
+       image = url['cover_xl'].replace("1000", "1200")
+    except:
+       try:
+          image = requests.get(URL).text
+       except:
+          image = requests.get(URL).text
+       image = BeautifulSoup(image, "html.parser").find("img", class_="img_main").get("src").replace("200", "1200")
     for a in url['tracks']['data']:
         music.append(a['title'])
         urls.append(a['link'])
     for a in url['tracks']['data']:
         del array[:]
-        ur = json.loads(requests.get("https://api.deezer.com/track/" + str(a['id'])).text)
+        try:
+           ur = json.loads(requests.get("https://api.deezer.com/track/" + str(a['id'])).text)
+        except:
+           ur = json.loads(requests.get("https://api.deezer.com/track/" + str(a['id'])).text)
+        try:
+           if ur['error']['message'] == "Quota limit exceeded":
+            raise QuotaExceeded("Too much requests limit yourself")
+        except KeyError:
+           None
         tracknum.append(ur['track_position'])
         discnum.append(ur['disk_number'])
         for a in ur['contributors']:
             array.append(a['name'])
-        if len(array) > 1:
-         for a in array:
-             for b in range(len(array)):
-                 try:
-                    if a in array[b] and a != array[b]:
-                     del array[b]
-                 except IndexError:
-                    break
-        artist.append(", ".join(array))
+            if len(array) > 1:
+             for a in array:
+                 for b in range(len(array)):
+                     try:
+                        if a in array[b] and a != array[b]:
+                         del array[b]
+                     except IndexError:
+                        break
+    artist.append(", ".join(array))
     album.append(url['title'])
     year.append(url['release_date'])
+    try:
+       for a in url['genres']['data']:
+           genre.append(a['name'])
+    except KeyError:
+       None
     for a in url['contributors']:
         if a['role'] == "Main":
          ar_album.append(a['name'])
@@ -229,11 +272,19 @@ def download_albumdee(URL, output=localdir + "/Songs/", check=True):
     return names     
 def download_playlistdee(URL, output=localdir + "/Songs/", check=True):
     array = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    url = json.loads(requests.get("https://api.deezer.com/playlist/" + URL.split("/")[-1] + "/tracks").text)
+    if "?utm" in URL:
+     URL,a = URL.split("?utm")
     try:
-       if url['error']['message'] == "no data" or url['error']['message'] == "Invalid query":
+       url = json.loads(requests.get("https://api.deezer.com/playlist/" + URL.split("/")[-1] + "/tracks").text)
+    except:
+       url = json.loads(requests.get("https://api.deezer.com/playlist/" + URL.split("/")[-1] + "/tracks").text)
+    try:
+       if url['error']['message'] == "Quota limit exceeded":
+        raise QuotaExceeded("Too much requests limit yourself")
+    except KeyError:
+       None
+    try:
+       if "error" in str(url):
         raise InvalidLink("Invalid link ;)")
     except KeyError:
        None
@@ -254,20 +305,20 @@ def download_trackspo(URL, output=localdir + "/Songs/", check=True):
     year = []
     genre = []
     ar_album = []
-    if not len(URL) == 53:
+    if "?" in URL:
      URL,a = URL.split("?")
-    if len(URL) != 53: 
-     raise InvalidLink("Invalid link ;)")
     try:
        url = spo.track(URL)
-    except:
+    except Exception as a:
+       if not "The access token expired" in str(a):
+        raise InvalidLink("Invalid link ;)")
        token = generate_token()
        spo = spotipy.Spotify(auth=token)
        url = spo.track(URL)
-    music.append(url['name'])   
+    music.append(url['name'])
     for a in range(20):
         try:
-            array.append(url['artists'][a]['name'])
+           array.append(url['artists'][a]['name'])
         except IndexError:
            artist.append(", ".join(array))
            del array[:]
@@ -277,8 +328,6 @@ def download_trackspo(URL, output=localdir + "/Songs/", check=True):
     tracknum.append(url['track_number'])
     discnum.append(url['disc_number'])
     year.append(url['album']['release_date'])
-    for a in url['album']['artists']:
-        ar_album.append(a['name'])
     song = music[0] + " - " + artist[0]
     url = requests.get("https://www.youtube.com/results?search_query=" + music[0].replace("#", "") + "+" + artist[0].replace("#", ""))
     bs = BeautifulSoup(url.text, "html.parser")
@@ -347,13 +396,13 @@ def download_albumspo(URL, output=localdir + "/Songs/", check=True):
     ar_album = []
     urls = []
     names = []
-    if not len(URL) == 53:
+    if "?" in URL:
      URL,a = URL.split("?")
-    if len(URL) != 53: 
-     raise InvalidLink("Invalid link ;)")
     try:
        tracks = spo.album(URL)
-    except:
+    except Exception as a:
+       if not "The access token expired" in str(a):
+        raise InvalidLink("Invalid link ;)")
        token = generate_token()
        spo = spotipy.Spotify(auth=token)
        tracks = spo.album(URL)
@@ -375,6 +424,7 @@ def download_albumspo(URL, output=localdir + "/Songs/", check=True):
                break
     year.append(tracks['release_date'])
     image = tracks['images'][0]['url']
+    artis = tracks['artists'][0]['name']
     for a in range(tracks['total_tracks'] // 50):
         try:
            tracks = spo.next(tracks['tracks'])
@@ -453,23 +503,23 @@ def download_albumspo(URL, output=localdir + "/Songs/", check=True):
 def download_playlistspo(URL, output=localdir + "/Songs/", check=True):
     global spo
     array = []
-    if not len(URL) == 87 and not len(URL) == 69:
+    if "?" in URL:
      URL,a = URL.split("?")
-    if len(URL) != 87 and len(URL) != 69:
-     raise InvalidLink("Invalid link ;)")
     URL = URL.split("/")
     try:
        tracks = spo.user_playlist_tracks(URL[-3], playlist_id=URL[-1])
-    except:
+    except Exception as a:
+       if not "The access token expired" in str(a):
+        raise InvalidLink("Invalid link ;)")
        token = generate_token()
        spo = spotipy.Spotify(auth=token)
        tracks = spo.user_playlist_tracks(URL[-3], playlist_id=URL[-1])
     for a in tracks['items']:
         try:
-           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
+           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check, True))
         except IndexError:
-           print("Track not found " + a['track']['name'])
-           array.append(str(output) + "/" + a['track']['name'])
+           print("\nTrack not found " + a['track']['name'])
+           array.append(localdir + "/Songs/" + a['track']['name'])
     for a in range(tracks['total'] // 100):
         try:
            tracks = spo.next(tracks)
@@ -477,12 +527,12 @@ def download_playlistspo(URL, output=localdir + "/Songs/", check=True):
            token = generate_token()
            spo = spotipy.Spotify(auth=token)
            tracks = spo.next(tracks)
-        for a in tracks['items']:
-            try:
-               array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
-            except IndexError:
-               print("Track not found " + a['track']['name'])
-               array.append(str(output) + "/" + a['track']['name'])
+    for a in tracks['items']:
+        try:
+           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check, True))
+        except IndexError:
+           print("\nTrack not found " + a['track']['name'])
+           array.append(localdir + "/Songs/" + a['track']['name'])
     return array
 def download_name(artist, song, output=localdir + "/Songs/", check=True):
     global spo

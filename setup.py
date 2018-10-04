@@ -1,7 +1,7 @@
 from setuptools import setup
 setup(
       name = "dwytsongs",
-      version = "1.0",
+      version = "1.4",
       description = "Downloads songs, albums or playlists through spotify or deezer link from youtube",
       license = "Apache-2.0",
       author = "An0nimia",
