@@ -11,6 +11,9 @@ import spotipy.oauth2 as oauth2
 from mutagen.id3 import ID3, APIC
 from mutagen.easyid3 import EasyID3
 localdir = os.getcwd()
+header = {
+          "Accept-Language": "en-US,en;q=0.5"
+}
 class TrackNotFound(Exception):
       def __init__(self, message):
           super().__init__(message)
@@ -98,13 +101,12 @@ def download_trackdee(URL, output=localdir + "/Songs/", check=True):
         raise TrackNotFound("Track not found: " + song)
     except OSError:
        raise TrackNotFound("Error cannot determine the length of the video")
-    dir = str(output) + "/" + artist[0].replace("/", "") + "/"
+    dir = str(output) + "/" + artist[0].replace("/", "").replace("$", "S") + "/"
     try:
-       if not os.path.isdir(dir):
-        os.makedirs(dir)
+       os.makedirs(dir)
     except:
        None
-    name = artist[0].replace("/", "") + " " + music[0].replace("/", "") + ".mp3"
+    name = artist[0].replace("/", "").replace("$", "S") + " " + music[0].replace("/", "").replace("$", "S") + ".mp3"
     if os.path.isfile(dir + name):
      if check == False:
       return dir + name
@@ -215,15 +217,14 @@ def download_albumdee(URL, output=localdir + "/Songs/", check=True):
     for a in url['contributors']:
         if a['role'] == "Main":
          ar_album.append(a['name'])
-    dir = str(output) + "/" + album[0].replace("/", "") + "/"
+    dir = str(output) + "/" + album[0].replace("/", "").replace("$", "S") + "/"
     try:
-       if not os.path.isdir(dir):
-        os.makedirs(dir)
+       os.makedirs(dir)
     except:
        None
     image = requests.get(image).content
     for a in tqdm(range(len(music))):
-        name = artist[a].replace("/", "") + " " + music[a].replace("/", "") + ".mp3"
+        name = artist[a].replace("/", "").replace("$", "S") + " " + music[a].replace("/", "").replace("$", "S") + ".mp3"
         names.append(dir + name)
         url = requests.get("https://www.youtube.com/results?search_query=" + music[a].replace("#", "") + "+" + artist[a].replace("#", ""))
         bs = BeautifulSoup(url.text, "html.parser")
@@ -340,13 +341,12 @@ def download_trackspo(URL, output=localdir + "/Songs/", check=True):
         raise TrackNotFound("Track not found: " + song)
     except OSError:
        raise TrackNotFound("Error cannot determine the length of the video")
-    dir = str(output) + "/" + artist[0].replace("/", "") + "/"
+    dir = str(output) + "/" + artist[0].replace("/", "").replace("$", "S") + "/"
     try:
-       if not os.path.isdir(dir):
-        os.makedirs(dir)
+       os.makedirs(dir)
     except:
        None
-    name = artist[0].replace("/", "") + " " + music[0].replace("/", "") + ".mp3"
+    name = artist[0].replace("/", "").replace("$", "S") + " " + music[0].replace("/", "").replace("$", "S") + ".mp3"
     if os.path.isfile(dir + name):
      if check == False:
       return dir + name
@@ -413,7 +413,7 @@ def download_albumspo(URL, output=localdir + "/Songs/", check=True):
         music.append(track['name'])
         tracknum.append(track['track_number'])
         discnum.append(track['disc_number'])
-        urls.append(track['external_urls']['spotify'])
+        urls.append(track['external_urls']['spotify'].split("/")[-1])
     for artists in tracks['tracks']['items']:
         for a in range(20):
             try:
@@ -445,15 +445,14 @@ def download_albumspo(URL, output=localdir + "/Songs/", check=True):
                    artist.append(", ".join(array))
                    del array[:]
                    break
-    dir = str(output) + "/" + album[0].replace("/", "") + "/"
+    dir = str(output) + "/" + album[0].replace("/", "").replace("$", "S") + "/"
     try:
-       if not os.path.isdir(dir):
-        os.makedirs(dir)
+       os.makedirs(dir)
     except:
        None
     image = requests.get(image).content
     for a in tqdm(range(len(music))):
-        name = artist[a].replace("/", "") + " " + music[a].replace("/", "") + ".mp3"
+        name = artist[a].replace("/", "").replace("$", "S") + " " + music[a].replace("/", "").replace("$", "S") + ".mp3"
         names.append(dir + name)
         url = requests.get("https://www.youtube.com/results?search_query=" + music[a].replace("#", "") + "+" + artist[a].replace("#", ""))
         bs = BeautifulSoup(url.text, "html.parser")
@@ -516,10 +515,10 @@ def download_playlistspo(URL, output=localdir + "/Songs/", check=True):
        tracks = spo.user_playlist_tracks(URL[-3], playlist_id=URL[-1])
     for a in tracks['items']:
         try:
-           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check, True))
+           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
         except IndexError:
            print("\nTrack not found " + a['track']['name'])
-           array.append(localdir + "/Songs/" + a['track']['name'])
+           array.append(localdir + "/Songs/" + a['track']['name'] + "/" + a['track']['name'] + ".mp3")
     for a in range(tracks['total'] // 100):
         try:
            tracks = spo.next(tracks)
@@ -529,10 +528,10 @@ def download_playlistspo(URL, output=localdir + "/Songs/", check=True):
            tracks = spo.next(tracks)
     for a in tracks['items']:
         try:
-           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check, True))
+           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
         except IndexError:
            print("\nTrack not found " + a['track']['name'])
-           array.append(localdir + "/Songs/" + a['track']['name'])
+           array.append(localdir + "/Songs/" + a['track']['name'] + "/" + a['track']['name'] + ".mp3")
     return array
 def download_name(artist, song, output=localdir + "/Songs/", check=True):
     global spo
