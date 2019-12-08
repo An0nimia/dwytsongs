@@ -1,547 +1,743 @@
 #!/usr/bin/python3
+
 import os
 import pafy
-import json
 import ffmpeg
-import spotipy
-import requests
 from tqdm import tqdm
+from spotipy import Spotify
 from bs4 import BeautifulSoup
-import spotipy.oauth2 as oauth2
-from mutagen.id3 import ID3, APIC
-from mutagen.easyid3 import EasyID3
-localdir = os.getcwd()
-header = {
-          "Accept-Language": "en-US,en;q=0.5"
-}
-class TrackNotFound(Exception):
-      def __init__(self, message):
-          super().__init__(message)
-class InvalidLink(Exception):
-      def __init__(self, message):
-          super().__init__(message)
-def generate_token():
-    credentials = oauth2.SpotifyClientCredentials(client_id="4fe3fecfe5334023a1472516cc99d805", client_secret="0f02b7c483c04257984695007a4a8d5c")
-    token = credentials.get_access_token()
-    return token
-token = generate_token()
-spo = spotipy.Spotify(auth=token)
-def download_trackdee(URL, output=localdir + "/Songs/", check=True):
-    if output == localdir + "/Songs":
-     if not os.path.isdir("Songs"):
-      os.makedirs("Songs")
-    array = []
-    music = []
-    artist = []
-    album = []
-    tracknum = []
-    discnum = []
-    year = []
-    genre = []
-    ar_album = []
-    if "?utm" in URL:
-     URL,a = URL.split("?utm")
-    URL = "http://www.deezer.com/track/" + URL.split("/")[-1]
-    try:
-       url = json.loads(requests.get("http://api.deezer.com/track/" + URL.split("/")[-1]).text)
-    except:
-       url = json.loads(requests.get("http://api.deezer.com/track/" + URL.split("/")[-1]).text)
-    try:
-       if url['error']['message'] == "Quota limit exceeded":
-        raise QuotaExceeded("Too much requests limit yourself")
-    except KeyError:
-       None
-    try:
-       if "error" in str(url):
-        raise InvalidLink("Invalid link ;)")
-    except KeyError:
-       None
-    try:
-       url1 = json.loads(requests.get("http://api.deezer.com/album/" + str(url['album']['id']), headers=header).text)
-    except:
-       url1 = json.loads(requests.get("http://api.deezer.com/album/" + str(url['album']['id']), headers=header).text)
-    try:
-       if url1['error']['message'] == "Quota limit exceeded":
-        raise QuotaExceeded("Too much requests limit yourself")
-    except KeyError:
-       None
-    try:
-       image = url['album']['cover_xl'].replace("1000", "1200")
-    except:
-       try:
-          image = requests.get(URL).text
-       except:
-          image = requests.get(URL).text
-       image = BeautifulSoup(image, "html.parser").find("img", class_="img_main").get("src").replace("120", "1200")
-    music.append(url['title'])
-    for a in url['contributors']:
-        array.append(a['name'])
-    if len(array) > 1:
-     for a in array:
-         for b in range(len(array)):
-             try:
-                if a in array[b] and a != array[b]:
-                 del array[b]
-             except IndexError:
-                break
-    artist.append(", ".join(array))
-    album.append(url['album']['title'])
-    tracknum.append(url['track_position'])
-    discnum.append(url['disk_number'])
-    year.append(url['album']['release_date'])
-    song = music[0] + " - " + artist[0]
-    url = requests.get("https://www.youtube.com/results?search_query=" + music[0].replace("#", "") + "+" + artist[0].replace("#", ""))
-    bs = BeautifulSoup(url.text, "html.parser")
-    for topicplus in bs.find_all("a"):
-        if len(topicplus.get("href")) == 20:
-         down = topicplus.get("href")
-         break
-    try:
-       if pafy.new("https://www.youtube.com" + down).length > 600:
-        raise TrackNotFound("Track not found: " + song)
-    except OSError:
-       raise TrackNotFound("Error cannot determine the length of the video")
-    dir = str(output) + "/" + artist[0].replace("/", "").replace("$", "S") + "/"
-    try:
-       os.makedirs(dir)
-    except:
-       None
-    name = artist[0].replace("/", "").replace("$", "S") + " " + music[0].replace("/", "").replace("$", "S") + ".mp3"
-    if os.path.isfile(dir + name):
-     if check == False:
-      return dir + name
-     ans = input("Song already exist do you want to redownload it?(y or n):")
-     if not ans == "y":
-      return
-    print("\nDownloading:" + song)
-    file = URL.split("/")[-1]
-    os.system('youtube-dl https://www.youtube.com' + down + ' -f best -o "' + dir + file + '"')
-    try:
-       ffmpeg.input(dir + file).output(dir + name).run(overwrite_output=True)
-       try:
-          os.remove(dir + file)
-       except FileNotFoundError:
-          None
-       image = requests.get(image).content
-       tag = EasyID3(dir + name)
-       tag.delete()
-       tag['artist'] = artist[0]
-       tag['title'] = music[0]
-       tag['date'] = year[0]
-       tag['album'] = album[0]
-       tag['tracknumber'] = str(tracknum[0])
-       tag['discnumber'] = str(discnum[0])
-       tag['albumartist'] = ", ".join(ar_album)
-       tag.save(v2_version=3)
-       audio = ID3(dir + name)
-       audio['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc=u'Cover', data=image)
-       audio.save()
-    except ffmpeg._run.Error:
-       os.remove(dir + file)
-       print("Error while downloading: " + song)
-    return dir + name
-def download_albumdee(URL, output=localdir + "/Songs/", check=True):
-    if output == localdir + "/Songs":
-     if not os.path.isdir("Songs"):
-      os.makedirs("Songs")
-    array = []
-    music = []
-    artist = []
-    album = []
-    tracknum = []
-    discnum = []
-    year = []
-    genre = []
-    ar_album = []
-    urls = []
-    names = []
-    if "?utm" in URL:
-     URL,a = URL.split("?utm")
-    URL = "http://www.deezer.com/album/" + URL.split("/")[-1]
-    try:
-       url = json.loads(requests.get("http://api.deezer.com/album/" + URL.split("/")[-1], headers=header).text)
-    except:
-       url = json.loads(requests.get("http://api.deezer.com/album/" + URL.split("/")[-1], headers=header).text)
-    try:
-       if url['error']['message'] == "Quota limit exceeded":
-        raise QuotaExceeded("Too much requests limit yourself")
-    except KeyError:
-       None
-    try:
-       if "error" in str(url):
-        raise InvalidLink("Invalid link ;)")
-    except KeyError:
-       None
-    try:
-       image = url['cover_xl'].replace("1000", "1200")
-    except:
-       try:
-          image = requests.get(URL).text
-       except:
-          image = requests.get(URL).text
-       image = BeautifulSoup(image, "html.parser").find("img", class_="img_main").get("src").replace("200", "1200")
-    for a in url['tracks']['data']:
-        music.append(a['title'])
-        urls.append(a['link'])
-    for a in url['tracks']['data']:
-        del array[:]
-        try:
-           ur = json.loads(requests.get("https://api.deezer.com/track/" + str(a['id'])).text)
-        except:
-           ur = json.loads(requests.get("https://api.deezer.com/track/" + str(a['id'])).text)
-        try:
-           if ur['error']['message'] == "Quota limit exceeded":
-            raise QuotaExceeded("Too much requests limit yourself")
-        except KeyError:
-           None
-        tracknum.append(ur['track_position'])
-        discnum.append(ur['disk_number'])
-        for a in ur['contributors']:
-            array.append(a['name'])
-            if len(array) > 1:
-             for a in array:
-                 for b in range(len(array)):
-                     try:
-                        if a in array[b] and a != array[b]:
-                         del array[b]
-                     except IndexError:
-                        break
-    artist.append(", ".join(array))
-    album.append(url['title'])
-    year.append(url['release_date'])
-    try:
-       for a in url['genres']['data']:
-           genre.append(a['name'])
-    except KeyError:
-       None
-    for a in url['contributors']:
-        if a['role'] == "Main":
-         ar_album.append(a['name'])
-    dir = str(output) + "/" + album[0].replace("/", "").replace("$", "S") + "/"
-    try:
-       os.makedirs(dir)
-    except:
-       None
-    image = requests.get(image).content
-    for a in tqdm(range(len(music))):
-        name = artist[a].replace("/", "").replace("$", "S") + " " + music[a].replace("/", "").replace("$", "S") + ".mp3"
-        names.append(dir + name)
-        url = requests.get("https://www.youtube.com/results?search_query=" + music[a].replace("#", "") + "+" + artist[a].replace("#", ""))
-        bs = BeautifulSoup(url.text, "html.parser")
-        for topicplus in bs.find_all("a"):
-            if len(topicplus.get("href")) == 20:
-             down = topicplus.get("href")
-             break
-        try:     
-           if pafy.new("https://www.youtube.com" + down).length > 600:
-            print("Track not found: " + music[a] + "  " + artist[a])
-            continue
-        except OSError:
-           print("Error cannot determine the length of the video")
-           continue    
-        if os.path.isfile(dir + name):
-         if check == False:
-          continue
-         print(dir + name)
-         ans = input("Song already exist do you want to redownload it?(y or n):")
-         if not ans == "y":
-          return
-        file = urls[a]
-        os.system('youtube-dl https://www.youtube.com' + down + ' -f best -o "' + dir + file + '"')
-        try:
-           ffmpeg.input(dir + file).output(dir + name).run(overwrite_output=True)
-           try:
-              os.remove(dir + file)
-           except FileNotFoundError:
-              None
-        except ffmpeg._run.Error:
-           os.remove(dir + file)
-           continue
-        tag = EasyID3(dir + name)
-        tag.delete()
-        tag['artist'] = artist[a]
-        tag['title'] = music[a]
-        tag['date'] = year[0]
-        tag['album'] = album[0]
-        tag['tracknumber'] = str(tracknum[a])
-        tag['discnumber'] = str(discnum[a])
-        tag['albumartist'] = ", ".join(ar_album)
-        tag.save(v2_version=3)
-        audio = ID3(dir + name)
-        audio['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc=u'Cover', data=image)
-        audio.save()
-    return names     
-def download_playlistdee(URL, output=localdir + "/Songs/", check=True):
-    array = []
-    if "?utm" in URL:
-     URL,a = URL.split("?utm")
-    try:
-       url = json.loads(requests.get("https://api.deezer.com/playlist/" + URL.split("/")[-1] + "/tracks").text)
-    except:
-       url = json.loads(requests.get("https://api.deezer.com/playlist/" + URL.split("/")[-1] + "/tracks").text)
-    try:
-       if url['error']['message'] == "Quota limit exceeded":
-        raise QuotaExceeded("Too much requests limit yourself")
-    except KeyError:
-       None
-    try:
-       if "error" in str(url):
-        raise InvalidLink("Invalid link ;)")
-    except KeyError:
-       None
-    for a in url['data']:
-        array.append(download_trackdee(a['link'], output, check))
-    return array
-def download_trackspo(URL, output=localdir + "/Songs/", check=True):
-    global spo
-    if output == localdir + "/Songs":
-     if not os.path.isdir("Songs"):
-      os.makedirs("Songs")
-    array = []
-    music = []
-    artist = []
-    album = []
-    tracknum = []
-    discnum = []
-    year = []
-    genre = []
-    ar_album = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    try:
-       url = spo.track(URL)
-    except Exception as a:
-       if not "The access token expired" in str(a):
-        raise InvalidLink("Invalid link ;)")
-       token = generate_token()
-       spo = spotipy.Spotify(auth=token)
-       url = spo.track(URL)
-    music.append(url['name'])
-    for a in range(20):
-        try:
-           array.append(url['artists'][a]['name'])
-        except IndexError:
-           artist.append(", ".join(array))
-           del array[:]
-           break
-    album.append(url['album']['name'])
-    image = url['album']['images'][0]['url']
-    tracknum.append(url['track_number'])
-    discnum.append(url['disc_number'])
-    year.append(url['album']['release_date'])
-    song = music[0] + " - " + artist[0]
-    url = requests.get("https://www.youtube.com/results?search_query=" + music[0].replace("#", "") + "+" + artist[0].replace("#", ""))
-    bs = BeautifulSoup(url.text, "html.parser")
-    for topicplus in bs.find_all("a"):
-        if len(topicplus.get("href")) == 20:
-         down = topicplus.get("href")
-         break
-    try:
-       if pafy.new("https://www.youtube.com" + down).length > 600:
-        raise TrackNotFound("Track not found: " + song)
-    except OSError:
-       raise TrackNotFound("Error cannot determine the length of the video")
-    dir = str(output) + "/" + artist[0].replace("/", "").replace("$", "S") + "/"
-    try:
-       os.makedirs(dir)
-    except:
-       None
-    name = artist[0].replace("/", "").replace("$", "S") + " " + music[0].replace("/", "").replace("$", "S") + ".mp3"
-    if os.path.isfile(dir + name):
-     if check == False:
-      return dir + name
-     ans = input("Song already exist do you want to redownload it?(y or n):")
-     if not ans == "y":
-      return
-    print("\nDownloading:" + song)
-    file = URL.split("/")[-1]
-    os.system('youtube-dl https://www.youtube.com' + down + ' -f best -o "' + dir + file + '"')
-    try:
-       ffmpeg.input(dir + file).output(dir + name).run(overwrite_output=True)
-       try:
-          os.remove(dir + file)
-       except FileNotFoundError:
-          None
-       image = requests.get(image).content
-       tag = EasyID3(dir + name)
-       tag.delete()
-       tag['artist'] = artist[0]
-       tag['title'] = music[0]
-       tag['date'] = year[0]
-       tag['album'] = album[0]
-       tag['tracknumber'] = str(tracknum[0])
-       tag['discnumber'] = str(discnum[0])
-       tag['albumartist'] = ", ".join(ar_album)
-       tag.save(v2_version=3)
-       audio = ID3(dir + name)
-       audio['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc=u'Cover', data=image)
-       audio.save()
-    except ffmpeg._run.Error:
-       os.remove(dir + file)
-       print("Error while downloading: " + song)
-    return dir + name
-def download_albumspo(URL, output=localdir + "/Songs/", check=True):
-    global spo
-    if output == localdir + "/Songs":
-     if not os.path.isdir("Songs"):
-      os.makedirs("Songs")
-    array = []
-    music = []
-    artist = []
-    album = []
-    tracknum = []
-    discnum = []
-    year = []
-    genre = []
-    ar_album = []
-    urls = []
-    names = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    try:
-       tracks = spo.album(URL)
-    except Exception as a:
-       if not "The access token expired" in str(a):
-        raise InvalidLink("Invalid link ;)")
-       token = generate_token()
-       spo = spotipy.Spotify(auth=token)
-       tracks = spo.album(URL)
-    album.append(tracks['name'])
-    for a in tracks['artists']:
-        ar_album.append(a['name'])
-    for track in tracks['tracks']['items']:
-        music.append(track['name'])
-        tracknum.append(track['track_number'])
-        discnum.append(track['disc_number'])
-        urls.append(track['external_urls']['spotify'].split("/")[-1])
-    for artists in tracks['tracks']['items']:
-        for a in range(20):
-            try:
-               array.append(artists['artists'][a]['name'])
-            except IndexError:
-               artist.append(", ".join(array))
-               del array[:]
-               break
-    year.append(tracks['release_date'])
-    image = tracks['images'][0]['url']
-    artis = tracks['artists'][0]['name']
-    for a in range(tracks['total_tracks'] // 50):
-        try:
-           tracks = spo.next(tracks['tracks'])
-        except:
-           token = generate_token()
-           spo = spotipy.Spotify(auth=token)
-           tracks = spo.next(tracks)['items']
-        for track in tracks['items']:
-            music.append(track['name'])
-            tracknum.append(track['track_number'])
-            discnum.append(track['disc_number'])
-            urls.append(track['external_urls']['spotify'])
-        for artists in tracks['items']:
-            for a in range(20):
-                try:
-                   array.append(artists['artists'][a]['name'])
-                except IndexError:
-                   artist.append(", ".join(array))
-                   del array[:]
-                   break
-    dir = str(output) + "/" + album[0].replace("/", "").replace("$", "S") + "/"
-    try:
-       os.makedirs(dir)
-    except:
-       None
-    image = requests.get(image).content
-    for a in tqdm(range(len(music))):
-        name = artist[a].replace("/", "").replace("$", "S") + " " + music[a].replace("/", "").replace("$", "S") + ".mp3"
-        names.append(dir + name)
-        url = requests.get("https://www.youtube.com/results?search_query=" + music[a].replace("#", "") + "+" + artist[a].replace("#", ""))
-        bs = BeautifulSoup(url.text, "html.parser")
-        for topicplus in bs.find_all("a"):
-            if len(topicplus.get("href")) == 20:
-             down = topicplus.get("href") 
-             break
-        try:
-           if pafy.new("https://www.youtube.com" + down).length > 600:
-            print("Track not found: " + music[a] + "  " + artist[a])
-            continue
-        except OSError:
-           print("Error cannot determine the length of the video")
-           continue    
-        if os.path.isfile(dir + name):
-         if check == False:
-          continue
-         print(dir + name)
-         ans = input("Song already exist do you want to redownload it?(y or n):")
-         if not ans == "y":
-          return
-        file = urls[a]
-        os.system('youtube-dl https://www.youtube.com' + down + ' -f best -o "' + dir + file + '"')
-        try:
-           ffmpeg.input(dir + file).output(dir + name).run(overwrite_output=True)
-           try:
-              os.remove(dir + file)
-           except FileNotFoundError:
-              None
-        except ffmpeg._run.Error:
-           os.remove(dir + file)
-           continue
-        tag = EasyID3(dir + name)
-        tag.delete()
-        tag['artist'] = artist[a]
-        tag['title'] = music[a]
-        tag['date'] = year[0]
-        tag['album'] = album[0]
-        tag['tracknumber'] = str(tracknum[a])
-        tag['discnumber'] = str(discnum[a])
-        tag['albumartist'] = ", ".join(ar_album)
-        tag.save(v2_version=3)
-        audio = ID3(dir + name)
-        audio['APIC'] = APIC(encoding=3, mime='image/jpeg', type=3, desc=u'Cover', data=image)
-        audio.save()
-    return names
-def download_playlistspo(URL, output=localdir + "/Songs/", check=True):
-    global spo
-    array = []
-    if "?" in URL:
-     URL,a = URL.split("?")
-    URL = URL.split("/")
-    try:
-       tracks = spo.user_playlist_tracks(URL[-3], playlist_id=URL[-1])
-    except Exception as a:
-       if not "The access token expired" in str(a):
-        raise InvalidLink("Invalid link ;)")
-       token = generate_token()
-       spo = spotipy.Spotify(auth=token)
-       tracks = spo.user_playlist_tracks(URL[-3], playlist_id=URL[-1])
-    for a in tracks['items']:
-        try:
-           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
-        except IndexError:
-           print("\nTrack not found " + a['track']['name'])
-           array.append(localdir + "/Songs/" + a['track']['name'] + "/" + a['track']['name'] + ".mp3")
-    for a in range(tracks['total'] // 100):
-        try:
-           tracks = spo.next(tracks)
-        except:
-           token = generate_token()
-           spo = spotipy.Spotify(auth=token)
-           tracks = spo.next(tracks)
-    for a in tracks['items']:
-        try:
-           array.append(download_trackspo(a['track']['external_urls']['spotify'], output, check))
-        except IndexError:
-           print("\nTrack not found " + a['track']['name'])
-           array.append(localdir + "/Songs/" + a['track']['name'] + "/" + a['track']['name'] + ".mp3")
-    return array
-def download_name(artist, song, output=localdir + "/Songs/", check=True):
-    global spo
-    try:
-       search = spo.search(q="track:" + song + " artist:" + artist)
-    except:
-       token = generate_token()
-       spo = spotipy.Spotify(auth=token)
-       search = spo.search(q="track:" + song + " artist:" + artist)
-    try:
-       return download_trackspo(search['tracks']['items'][0]['external_urls']['spotify'], output, check)
-    except:
-       raise TrackNotFound("Track not found: " + song + " - " + artist)
+from dwytsongs.utils import *
+from dwytsongs import exceptions
+
+stock_output = "%s/Songs" % os.getcwd()
+stock_recursive_download = False
+stock_not_interface = False
+stock_zip = False
+
+spo = Spotify(
+	auth = generate_token()
+)
+
+def download(directory, name, recursive_download, not_interface, datas):
+	song = "{} - {}".format(datas['music'], datas['artist'])
+
+	body = request(
+		"https://www.youtube.com/results?search_query=%s" % song.replace("#", "")
+	).text
+
+	links = BeautifulSoup(body, "html.parser").find_all("a")
+
+	for link in links:
+		href = link.get("href")
+
+		if len(href) == 20:
+			down = href
+			break
+
+	out_yt = directory + down
+	out = "%s.mp3" % name
+
+	try:
+		if pafy.new("https://www.youtube.com" + down).length > 800:
+			raise exceptions.TrackNotFound("Track not found: " + song)
+	except (OSError, NameError):
+		raise exceptions.TrackNotFound("Error cannot get information about video")
+
+	if os.path.isfile(out):
+		if recursive_download:
+			return out
+
+		ans = input("Song already exist do you want to redownload it?(y or n): ")
+
+		if not ans in ["Y", "y", "Yes", "YES"]:
+			return out
+
+	quiet = "-q"
+
+	if not not_interface:
+		quiet = ""
+		print("Downloading: %s" % song)
+
+	os.system(
+		"youtube-dl %s https://www.youtube.com%s -f best -o '%s'"
+		% (
+			quiet,
+			down,
+			out_yt
+		)
+	)
+
+	try:
+		(
+			ffmpeg
+			.input(out_yt)
+			.output(out)
+			.run(
+				quiet = not_interface,
+				overwrite_output = True
+			)
+		)
+	except KeyError:
+		try:
+			os.remove(out_yt)
+		except FileNotFoundError:
+			pass
+
+		raise exceptions.TrackNotFound("Error while downloading: " + song)
+
+	os.remove(out_yt)
+	write_tags(out, datas)
+
+	return out
+
+def download_trackdee(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface
+):
+	datas = {}
+
+	ids = (
+		URL
+		.split("?utm")[0]
+		.split("/")[-1]
+	)
+
+	URL1 = "https://www.deezer.com/track/%s" % ids
+	URL2 = "https://api.deezer.com/track/%s" % ids
+	url = request(URL2, True).json()
+
+	url1 = request(
+		"http://api.deezer.com/album/%d" % url['album']['id'], True
+	).json()
+
+	image = url1['cover_xl']
+
+	if not image:
+		body = request(URL1).text
+
+		image = (
+			BeautifulSoup(body, "html.parser")
+			.find("meta", property = "og:image")
+			.get("content")
+			.replace("500x500", "1200x1200")
+		)
+
+	image = request(
+		image.replace("1000x1000", "1200x1200")
+	).content
+
+	if len(image) == 13:
+		image = request("https://e-cdns-images.dzcdn.net/images/cover/1200x1200-000000-80-0-0.jpg").content
+
+	datas['image'] = image
+	datas['music'] = url['title']
+	array = []
+
+	for a in url['contributors']:
+		if a['name'] != "":
+			array.append(a['name'])
+
+	array.append(
+		url['artist']['name']
+	)
+
+	datas['artist'] = artist_sort(array)
+	datas['album'] = url1['title']
+	datas['tracknum'] = str(url['track_position'])
+	datas['discnum'] = str(url['disk_number'])
+	datas['year'] = url['release_date']
+	datas['genre'] = []
+
+	try:
+		for a in url1['genres']['data']:
+			datas['genre'].append(a['name'])
+	except KeyError:
+		pass
+
+	datas['genre'] = " & ".join(datas['genre'])
+	datas['ar_album'] = []
+
+	for a in url1['contributors']:
+		if a['role'] == "Main":
+			datas['ar_album'].append(a['name'])
+
+	datas['ar_album'] = " & ".join(datas['ar_album'])
+	datas['label'] = url1['label']
+	datas['bpm'] = str(url['bpm'])
+	datas['gain'] = str(url['gain'])
+	datas['duration'] = str(url['duration'])
+	datas['isrc'] = url['isrc']
+	album = var_excape(datas['album'])
+
+	directory = (
+		"%s%s %s/"
+		% (
+			output,
+			album,
+			url1['upc']
+		)
+	)
+
+	check_dir(directory)
+
+	name = (
+		"%s%s CD %s TRACK %s"
+		% (
+			directory,
+			album,
+			datas['discnum'],
+			datas['tracknum']
+		)
+	)
+
+	out = download(directory, name, recursive_download, not_interface, datas)
+
+	return out
+
+def download_albumdee(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface,
+	zips = stock_zip
+):
+	datas = {}
+	detas = {}
+	datas['music'] = []
+	datas['artist'] = []
+	datas['tracknum'] = []
+	datas['discnum'] = []
+	datas['bpm'] = []
+	datas['gain'] = []
+	datas['duration'] = []
+	datas['isrc'] = []
+	names = []
+	array = []
+	nams = []
+
+	ids = (
+		URL
+		.split("?utm")[0]
+		.split("/")[-1]
+	)
+
+	URL1 = "https://www.deezer.com/album/%s" % ids
+	URL2 = "https://api.deezer.com/album/%s" % ids
+	url = request(URL2, True).json()
+	datas['album'] = url['title']
+	datas['label'] = url['label']
+	datas['year'] = url['release_date']
+	image = url['cover_xl']
+
+	if not image:
+		URL = "https://www.deezer.com/album/%s" % ids
+		body = request(URL).text
+
+		image = (
+			BeautifulSoup(body, "html.parser")
+			.find("img", class_ = "img_main")
+			.get("src")
+			.replace("200x200", "1200x1200")
+		)
+
+	image = request(
+		image.replace("1000x1000", "1200x1200")
+	).content
+
+	if len(image) == 13:
+		image = request("https://e-cdns-images.dzcdn.net/images/cover/1200x1200-000000-80-0-0.jpg").content
+
+	datas['image'] = image
+	datas['genre'] = []
+
+	try:
+		for a in url['genres']['data']:
+			datas['genre'].append(a['name'])
+	except KeyError:
+		pass
+
+	datas['genre'] = " & ".join(datas['genre'])
+	datas['ar_album'] = []
+
+	for a in url['contributors']:
+		if a['role'] == "Main":
+			datas['ar_album'].append(a['name'])
+
+	datas['ar_album'] = " & ".join(datas['ar_album'])
+	album = var_excape(datas['album'])
+
+	directory = (
+		"%s%s %s/"
+		% (
+			output,
+			album,
+			url['upc']
+		)
+	)
+
+	check_dir(directory)
+
+	for a in url['tracks']['data']:
+		del array[:]
+		datas['music'].append(a['title'])
+
+		ur = request(
+			"https://api.deezer.com/track/%d" % a['id'], True
+		).json()
+
+		discnum = str(ur['disk_number'])
+		tracknum = str(ur['track_position'])
+
+		names.append(
+			"%s%s CD %s TRACK %s"
+			% (
+				directory,
+				album,
+				discnum,
+				tracknum
+			)
+		)
+
+		datas['tracknum'].append(tracknum)
+		datas['discnum'].append(discnum)
+
+		datas['bpm'].append(
+			str(ur['bpm'])
+		)
+
+		datas['gain'].append(
+			str(ur['gain'])
+		)
+
+		datas['duration'].append(
+			str(ur['duration'])
+		)
+
+		datas['isrc'].append(ur['isrc'])
+
+		for a in ur['contributors']:
+			if a['name'] != "":
+				array.append(a['name'])
+
+		array.append(
+			ur['artist']['name']
+		)
+
+		datas['artist'].append(
+			artist_sort(array)
+		)
+
+	detas['image'] = image
+	detas['album'] = datas['album']
+	detas['year'] = datas['year']
+	detas['genre'] = datas['genre']
+	detas['ar_album'] = datas['ar_album']
+	detas['label'] = datas['label']
+
+	for a in tqdm(
+		range(
+			len(names)
+		), 
+		disable = not_interface
+	):
+		detas['music'] = datas['music'][a]
+		detas['artist'] = datas['artist'][a]
+		detas['tracknum'] = datas['tracknum'][a]
+		detas['discnum'] = datas['discnum'][a]
+		detas['bpm'] = datas['bpm'][a]
+		detas['gain'] = datas['gain'][a]
+		detas['duration'] = datas['duration'][a]
+		detas['isrc'] = datas['isrc'][a]
+		song = "{} - {}".format(detas['music'], detas['artist'])
+
+		try:
+			nams.append(
+				download(directory, names[a], recursive_download, not_interface, detas)
+			)
+		except exceptions.TrackNotFound:
+			nams.append(name[a])
+			print("Track not found: %s :(" % song)
+			continue
+
+	if zips:
+		zip_name = "{}{}.zip".format(
+			directory, directory.split("/")[-2] 
+		)
+
+		create_zip(zip_name, nams)
+
+		return nams, zip_name
+
+	return nams
+
+def download_playlistdee(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface,
+	zips = stock_zip
+):
+	array = []
+
+	ids = (
+		URL
+		.split("?utm")[0]
+		.split("/")[-1]
+	)
+
+	url = request(
+		"https://api.deezer.com/playlist/%s" % ids, True
+	).json()
+
+	for a in url['tracks']['data']:
+		try:
+			array.append(
+				download_trackdee(
+					a['link'], output,
+					recursive_download, not_interface
+				)
+			)
+		except (exceptions.TrackNotFound, exceptions.NoDataApi):
+			song = "{} - {}".format(a['title'], a['artist']['name'])
+			print("Track not found: %s" % song)
+			array.append(song)
+
+	if zips:
+		zip_name = "{}playlist {}.zip".format(output, ids)
+		create_zip(zip_name, array)
+
+		return array, zip_name
+
+	return array
+
+def download_trackspo(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface
+):
+	global spo
+
+	datas = {}
+	URL = URL.split("?")[0]
+
+	try:
+		url = spo.track(URL)
+	except Exception as a:
+		if not "The access token expired" in str(a):
+			raise exceptions.InvalidLink("Invalid link ;)")
+
+		spo = Spotify(
+			generate_token()
+		)
+
+		url = spo.track(URL)
+
+	URL1 = url['album']['external_urls']['spotify']
+
+	try:
+		url1 = spo.album(URL1)
+	except Exception as a:
+		if not "The access token expired" in str(a):
+			raise exceptions.InvalidLink("Invalid link ;)")
+
+		spo = Spotify(
+			generate_token()
+		)
+
+		url1 = spo.album(URL1)
+
+	datas['image'] = request(
+		url1['images'][0]['url']
+	).content
+
+	datas['music'] = url['name']
+
+	array = [
+		a['name'] for a in url['artists']
+	]
+
+	datas['artist'] = ", ".join(array)
+	datas['album'] = url1['name']
+	datas['tracknum'] = str(url['track_number'])
+	datas['discnum'] = str(url['disc_number'])
+	datas['year'] = url1['release_date']
+	datas['genre'] = " & ".join(url1['genres'])
+
+	array = [
+		a['name'] for a in url1['artists']
+	]
+
+	datas['ar_album'] = ", ".join(array)
+	datas['label'] = url1['label']
+	datas['bpm'] = ""
+	datas['gain'] = "0"
+	datas['duration'] = str(url['duration_ms'] * 1000)
+	datas['isrc'] = url['external_ids']['isrc']
+	album = var_excape(datas['album'])
+
+	directory = (
+		"%s%s %s/"
+		% (
+			output,
+			album,
+			url1['external_ids']['upc']
+		)
+	)
+
+	check_dir(directory)
+
+	name = (
+		"%s%s CD %s TRACK %s"
+		% (
+			directory,
+			album,
+			datas['discnum'],
+			datas['tracknum']
+		)
+	)
+
+	out = download(directory, name, recursive_download, not_interface, datas)
+
+	return out
+
+def download_albumspo(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface,
+	zips = stock_zip
+):
+	global spo
+
+	datas = {}
+	detas = {}
+	datas['music'] = []
+	datas['artist'] = []
+	datas['tracknum'] = []
+	datas['discnum'] = []
+	datas['duration'] = []
+	names = []
+	nams = []
+
+	try:
+		url = spo.album(URL)
+	except Exception as a:
+		if not "The access token expired" in str(a):
+			raise exceptions.InvalidLink("Invalid link ;)")
+
+		spo = Spotify(
+			generate_token()
+		)
+
+		url = spo.album(URL)
+
+	detas['image'] = request(
+		url['images'][0]['url']
+	).content
+
+	detas['album'] = url['name']
+	detas['year'] = url['release_date']
+	detas['genre'] = " & ".join(url['genres'])
+
+	array = [
+		a['name'] for a in url['artists']
+	]
+
+	detas['ar_album'] = ", ".join(array)
+	detas['label'] = url['label']
+	detas['bpm'] = ""
+	detas['gain'] = "0"	
+	detas['isrc'] = ""
+	album = var_excape(detas['album'])
+
+	directory = (
+		"%s%s %s/"
+		% (
+			output,
+			album,
+			url['external_ids']['upc']
+		)
+	)
+
+	check_dir(directory)
+	tot = url['total_tracks']
+
+	def lazy(a):
+		datas['music'].append(a['name'])
+		discnum = str(a['disc_number'])
+		tracknum = str(a['track_number'])
+
+		names.append(
+			"%s%s CD %s TRACK %s"
+			% (
+				directory,
+				album,
+				discnum,
+				tracknum
+			)
+		)
+
+		datas['tracknum'].append(tracknum)
+		datas['discnum'].append(discnum)
+
+		datas['duration'].append(
+			str(a['duration_ms'] * 1000)
+		)
+
+		array = [
+			b['name'] for b in a['artists']
+		]
+
+		datas['artist'].append(
+			", ".join(array)
+		)
+
+	for a in url['tracks']['items']:
+		lazy(a)
+
+	if tot != 50:
+		for a in range(tot // 50):
+			try:
+				url = spo.next(url['tracks'])
+			except:
+				spo = Spotify(
+					generate_token()
+				)
+
+				url = spo.next(url['tracks'])
+
+			for a in url['items']:
+				lazy(a)
+
+	for a in tqdm(
+		range(
+			len(names)
+		), 
+		disable = not_interface
+	):
+		detas['music'] = datas['music'][a]
+		detas['artist'] = datas['artist'][a]
+		detas['tracknum'] = datas['tracknum'][a]
+		detas['discnum'] = datas['discnum'][a]
+		detas['duration'] = datas['duration'][a]
+		song = "{} - {}".format(detas['music'], detas['artist'])
+
+		try:
+			nams.append(
+				download(directory, names[a], recursive_download, not_interface, detas)
+			)
+		except exceptions.TrackNotFound:
+			nams.append(name[a])
+			print("Track not found: %s :(" % song)
+			continue
+
+	if zips:
+		zip_name = "{}{}.zip".format(
+			directory, directory.split("/")[-2] 
+		)
+
+		create_zip(zip_name, nams)
+
+		return nams, zip_name
+
+	return nams
+
+def download_playlistspo(
+	URL,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface,
+	zips = stock_zip
+):
+	array = []
+
+	URL = (
+		URL
+		.split("?")[0]
+		.split("/")
+	)
+
+	try:
+		tracks = spo.user_playlist_tracks(URL[-3], URL[-1])
+	except Exception as a:
+		if not "The access token expired" in str(a):
+			raise exceptions.InvalidLink("Invalid link ;)")
+
+		spo = Spotify(
+			generate_token()
+		)
+
+		tracks = spo.user_playlist_tracks(URL[-3], URL[-1])
+
+	for a in tracks['items']:
+		try:
+			array.append(
+				download_trackspo(
+					a['track']['external_urls']['spotify'], output,
+					recursive_download, not_interface
+				)
+			)
+		except:
+			print("Track not found :(")
+			array.append("None")
+
+	if tracks['total'] != 100:
+		for a in range(tracks['total'] // 100):
+			try:
+				tracks = spo.next(tracks)
+			except:
+				spo = Spotify(
+					generate_token()
+				)
+
+				tracks = spo.next(tracks)
+
+			for a in tracks['items']:
+				try:
+					array.append(
+						download_trackspo(
+							a['track']['external_urls']['spotify'], output,
+							recursive_download, not_interface
+						)
+					)
+				except:
+					print("Track not found :(")
+					array.append("None")
+
+	if zips:
+		zip_name = "{}playlist {}.zip".format(output, URL[-1])
+		create_zip(zip_name, array)
+
+		return array, zip_name
+
+	return array
+
+def download_name(
+	artist, song,
+	output = stock_output + "/",
+	recursive_download = stock_recursive_download,
+	not_interface = stock_not_interface
+):
+	global spo
+
+	query = "track:{} artist:{}".format(song, artist)
+
+	try:
+		search = spo.search(query)
+	except:
+		self.spo = Spotify(
+			generate_token()
+		)
+
+		search = spo.search(query)
+
+	try:
+		return download_trackspo(
+			search['tracks']['items'][0]['external_urls']['spotify'],
+			output, recursive_download, not_interface
+		)
+	except IndexError:
+		raise exceptions.TrackNotFound("Track not found: :(")
