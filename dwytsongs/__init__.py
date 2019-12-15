@@ -87,7 +87,6 @@ def download(directory, name, recursive_download, not_interface, datas):
 
 	os.remove(out_yt)
 	write_tags(out, datas)
-
 	return out
 
 def download_trackdee(
@@ -192,7 +191,10 @@ def download_trackdee(
 		)
 	)
 
-	out = download(directory, name, recursive_download, not_interface, datas)
+	out = download(
+		directory, name,
+		recursive_download, not_interface, datas
+	)
 
 	return out
 
@@ -354,10 +356,13 @@ def download_albumdee(
 
 		try:
 			nams.append(
-				download(directory, names[a], recursive_download, not_interface, detas)
+				download(
+					directory, names[a],
+					recursive_download, not_interface, detas
+				)
 			)
 		except exceptions.TrackNotFound:
-			nams.append(name[a])
+			nams.append(names[a])
 			print("Track not found: %s :(" % song)
 			continue
 
@@ -367,7 +372,6 @@ def download_albumdee(
 		)
 
 		create_zip(zip_name, nams)
-
 		return nams, zip_name
 
 	return nams
@@ -407,7 +411,6 @@ def download_playlistdee(
 	if zips:
 		zip_name = "{}playlist {}.zip".format(output, ids)
 		create_zip(zip_name, array)
-
 		return array, zip_name
 
 	return array
@@ -499,7 +502,10 @@ def download_trackspo(
 		)
 	)
 
-	out = download(directory, name, recursive_download, not_interface, datas)
+	out = download(
+		directory, name,
+		recursive_download, not_interface, datas
+	)
 
 	return out
 
@@ -627,10 +633,13 @@ def download_albumspo(
 
 		try:
 			nams.append(
-				download(directory, names[a], recursive_download, not_interface, detas)
+				download(
+					directory, names[a],
+					recursive_download, not_interface, detas
+				)
 			)
 		except exceptions.TrackNotFound:
-			nams.append(name[a])
+			nams.append(names[a])
 			print("Track not found: %s :(" % song)
 			continue
 
@@ -640,7 +649,6 @@ def download_albumspo(
 		)
 
 		create_zip(zip_name, nams)
-
 		return nams, zip_name
 
 	return nams
@@ -652,6 +660,8 @@ def download_playlistspo(
 	not_interface = stock_not_interface,
 	zips = stock_zip
 ):
+	global spo
+
 	array = []
 
 	URL = (
@@ -710,7 +720,6 @@ def download_playlistspo(
 	if zips:
 		zip_name = "{}playlist {}.zip".format(output, URL[-1])
 		create_zip(zip_name, array)
-
 		return array, zip_name
 
 	return array
@@ -728,7 +737,7 @@ def download_name(
 	try:
 		search = spo.search(query)
 	except:
-		self.spo = Spotify(
+		spo = Spotify(
 			generate_token()
 		)
 
