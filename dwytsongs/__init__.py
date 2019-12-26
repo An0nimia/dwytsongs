@@ -604,19 +604,18 @@ def download_albumspo(
 	for a in url['tracks']['items']:
 		lazy(a)
 
-	if tot != 50:
-		for a in range(tot // 50):
-			try:
-				url = spo.next(url['tracks'])
-			except:
-				spo = Spotify(
-					generate_token()
-				)
+	for a in range(tot // 50 - 1):
+		try:
+			url = spo.next(url['tracks'])
+		except:
+			spo = Spotify(
+				generate_token()
+			)
 
-				url = spo.next(url['tracks'])
+			url = spo.next(url['tracks'])
 
-			for a in url['items']:
-				lazy(a)
+		for a in url['items']:
+			lazy(a)
 
 	for a in tqdm(
 		range(
@@ -682,43 +681,36 @@ def download_playlistspo(
 
 		tracks = spo.user_playlist_tracks(URL[-3], URL[-1])
 
-	for a in tracks['items']:
-		try:
-			array.append(
-				download_trackspo(
-					a['track']['external_urls']['spotify'], output,
-					recursive_download, not_interface
-				)
-			)
-		except:
-			print("Track not found :(")
-			array.append("None")
-
-	if tracks['total'] != 100:
-		for a in range(tracks['total'] // 100):
+	def lazy(tracks):
+		for a in tracks['items']:
 			try:
-				tracks = spo.next(tracks)
-			except:
-				spo = Spotify(
-					generate_token()
-				)
-
-				tracks = spo.next(tracks)
-
-			for a in tracks['items']:
-				try:
-					array.append(
-						download_trackspo(
-							a['track']['external_urls']['spotify'], output,
-							recursive_download, not_interface
-						)
+				array.append(
+					download_trackspo(
+						a['track']['external_urls']['spotify'],
+						output, recursive_download, not_interface
 					)
-				except:
-					print("Track not found :(")
-					array.append("None")
+				)
+			except:
+				print("Track not found :(")
+				array.append("None")
+
+	lazy(tracks)
+	tot = tracks['total']
+
+	for a in range(tot // 100 - 1):
+		try:
+			tracks = spo.next(tracks)
+		except:
+			spo = Spotify(
+				generate_token()
+			)
+
+			tracks = spo.next(tracks)
+
+		lazy(tracks)
 
 	if zips:
-		zip_name = "{}playlist {}.zip".format(output, URL[-1])
+		zip_name = "{}playlist {}.zip".format(output, URL[-1])			
 		create_zip(zip_name, array)
 		return array, zip_name
 

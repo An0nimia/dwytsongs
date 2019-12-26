@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name = "dwytsongs",
-	version = "2.5",
+	version = "2.5.2",
 	description = "Downloads songs, albums or playlists through spotify or deezer link from youtube",
 	license = "CC BY-NC-SA 4.0",
 	author = "An0nimia",
